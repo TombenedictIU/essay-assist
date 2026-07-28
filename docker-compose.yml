@@ -1,0 +1,22 @@
+services:
+  backend:
+    build: ./backend
+    container_name: evalqueue-backend
+    environment:
+      JWT_SECRET: change-me-in-production
+      PORT: 4000
+      NODE_ENV: production
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: evalqueue-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
