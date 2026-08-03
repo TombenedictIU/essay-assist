@@ -58,12 +58,6 @@ STRICT REQUIREMENTS:
 
 * Styling: Use a professional, academic aesthetic with a clean white/gray background and primary blue accents. Ensure tables and forms are highly legible.
 
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/7607a8dc-5061-45b1-8c14-c88681e3a8fa).
-
 - **Ship faster**: describe what you want to build and Lovable handles the code.
 - **Stay in sync**: every change made in Lovable is committed straight to this repository.
 - **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
