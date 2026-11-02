@@ -70,7 +70,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  register: (body: { name: string; email: string; password: string; role: Role }) =>
+  register: (body: { name: string; email: string; password: string; role: Role; inviteCode?: string }) =>
     request<{ token: string; user: User }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(body),

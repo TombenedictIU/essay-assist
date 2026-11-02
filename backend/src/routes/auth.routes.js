@@ -1,26 +1,34 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { hashPassword, verifyPassword, signToken, requireAuth } from "../auth.js";
+import { hashPassword, verifyPassword, signToken, requireAuth, safeEqual } from "../auth.js";
 
 const router = Router();
 
 router.post("/register", (req, res) => {
-  const { name, email, password, role } = req.body || {};
-  if (!name || !email || !password || !role) {
-    return res.status(400).json({ error: "name, email, password, role required" });
+  const { name, email, password, role = "Student", inviteCode } = req.body || {};
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "name, email, password required" });
   }
   if (role !== "Student" && role !== "Instructor") {
     return res.status(400).json({ error: "role must be Student or Instructor" });
   }
+  // Privilege escalation guard: instructor accounts need the server-side invite code.
+  if (role === "Instructor") {
+    const expected = process.env.INSTRUCTOR_INVITE_CODE;
+    if (!expected || !safeEqual(inviteCode, expected)) {
+      return res.status(403).json({ error: "a valid instructor invite code is required" });
+    }
+  }
   if (String(password).length < 6) {
     return res.status(400).json({ error: "password must be at least 6 characters" });
   }
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  const normalisedEmail = String(email).trim().toLowerCase();
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(normalisedEmail);
   if (existing) return res.status(409).json({ error: "email already registered" });
 
   const info = db
     .prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)")
-    .run(name.trim(), String(email).trim().toLowerCase(), hashPassword(password), role);
+    .run(String(name).trim(), normalisedEmail, hashPassword(password), role);
 
   const user = db
     .prepare("SELECT id, name, email, role FROM users WHERE id = ?")

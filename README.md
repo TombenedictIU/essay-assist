@@ -1,74 +1,83 @@
-# Essay Assist
+# EvalQueue
 
-Build a full-stack web application named "EvalQueue," an automated essay evaluation system for university professors and students. The application must feature Role-Based Access Control (RBAC), an asynchronous text-evaluation engine, and a clean, responsive UI. 
+Automated essay evaluation system with Role-Based Access Control.
 
-TECH STACK:
+- **Backend**: Node.js + Express + SQLite (better-sqlite3) + JWT
+- **Frontend**: React + Vite + TypeScript + Tailwind CSS + Lucide icons
+- **Deployment**: Docker Compose (backend + frontend containers)
 
-* Frontend: React with Vite, Tailwind CSS, and Lucide Icons for UI elements.
+## Run with Docker
 
-* Backend: Node.js/Express.
+```bash
+docker compose up --build
+```
 
-* Database: SQLite (for easy portability).
+- Frontend: http://localhost:8080
+- Backend API: http://localhost:4000/api
 
-* Deployment: Generate a fully functional `docker-compose.yml` file and Dockerfile at the root of the project to run both the frontend and backend.
+The SQLite database is persisted to `./data/evalqueue.db` on the host.
 
-DATABASE SCHEMA:
+### Configuration
 
-* Users: id, name, email, password_hash, role ('Student' or 'Instructor').
+Copy `.env.example` to `.env` (next to `docker-compose.yml`) before starting. All values are optional for a local demo.
 
-* Assignments: id, instructor_id, title, description, required_keywords (comma-separated string).
+| Variable | Purpose | If unset |
+|---|---|---|
+| `JWT_SECRET` | Signs login tokens | A random per-process secret is generated; logins end on restart |
+| `INSTRUCTOR_INVITE_CODE` | Code required to register an *Instructor* account | Instructor self-registration is disabled (students only) |
+| `CORS_ORIGIN` | Comma-separated allowed origins (only needed without the nginx proxy) | CORS disabled (same-origin) |
+| `AUTH_RATE_LIMIT_MAX` | Max login/register requests per IP per 15 min | 30 |
 
-* Submissions: id, assignment_id, student_id, content (text), status ('Pending', 'Evaluated', 'Graded'), similarity_score (integer 0-100), final_grade (integer 0-100), instructor_feedback (text).
+## Seed credentials
 
-USER WORKFLOWS & UI:
+The database initializes with realistic test data on first boot.
 
-* Authentication: A login and registration screen. Users select their role upon registration. Route them to their respective dashboards upon login.
+| Role       | Name                | Email                        | Password    |
+|------------|---------------------|------------------------------|-------------|
+| Instructor | Dr. Elena Marsh     | elena.marsh@evalqueue.edu    | Passw0rd!   |
+| Student    | Priya Ramanathan    | priya@evalqueue.edu          | Passw0rd!   |
+| Student    | Marcus Okafor       | marcus@evalqueue.edu         | Passw0rd!   |
 
-* Instructor Dashboard: 
+Pre-seeded content: 2 assignments and 3 submissions. On start-up the recovery sweep evaluates any submission still `Pending`, so the seeded pending submission becomes `Evaluated` immediately.
 
-  - A view to create new assignments by entering a title, description, and a list of required keywords.
+## Local development (without Docker)
 
-  - A view to see all student submissions.
+```bash
+# Terminal 1
+cd backend
+npm install
+JWT_SECRET=dev-secret INSTRUCTOR_INVITE_CODE=letmein npm start
 
-  - A grading interface to view a specific submission, see the auto-generated `similarity_score`, override it with a `final_grade`, and leave `instructor_feedback`.
-
-* Student Dashboard:
-
-  - A view to see available assignments.
-
-  - A submission form featuring a large text area to write or paste their essay.
-
-  - A view to check their submission status and read the final grade and feedback.
-
-CORE BUSINESS LOGIC (THE EVALUATION ENGINE):
-
-* When a student submits an assignment, simulate an asynchronous background evaluation.
-
-* The system should parse the student's `content` and check it against the assignment's `required_keywords`. 
-
-* Calculate a `similarity_score` percentage based on how many of the required keywords appear in the text.
-
-* Update the submission status from 'Pending' to 'Evaluated' once this calculation is complete.
-
-STRICT REQUIREMENTS:
-
-* Seed Data: The database MUST initialize with realistic test data. Include one Instructor account, two Student accounts, two pre-created assignments, and three mock submissions in various states (Pending, Graded). No generic "lorem ipsum" filler text.
-
-* Architecture: Maintain a strict separation of concerns between the frontend presentation layer and backend API routes.
-
-* Styling: Use a professional, academic aesthetic with a clean white/gray background and primary blue accents. Ensure tables and forms are highly legible.
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+# Terminal 2
+cd frontend
+npm install
 npm run dev
 ```
+
+Vite dev server runs on http://localhost:5173 and proxies `/api` to the backend on `:4000`.
+
+## Architecture
+
+```
+frontend (nginx :80)  ──/api/*──▶  backend (express :4000)  ──▶  SQLite (/app/data/evalqueue.db)
+```
+
+- JWT stored in `localStorage`, attached as `Authorization: Bearer <token>`.
+- Evaluation engine (`backend/src/evaluator.js`) runs asynchronously via `setImmediate` after each `POST /api/submissions`, computing a `similarity_score` from required-keyword hits and flipping status `Pending → Evaluated`.
+- Instructors override the auto score with a `final_grade` and `instructor_feedback`, which flips status to `Graded`.
+
+## Tests
+
+```bash
+cd backend
+npm test        # 21 automated API tests (Node built-in test runner)
+```
+
+Covered: authentication, RBAC, privilege-escalation guard, ownership checks, validation, asynchronous evaluation, whole-term keyword scoring, start-up recovery sweep, rate limiting. A GitHub Actions workflow (`.github/workflows/ci.yml`) runs the backend tests and the frontend build on every push.
+
+## Security notes
+
+- Instructor accounts cannot be self-created without the server-side invite code.
+- Instructors see and grade only submissions for their own assignments; students see only their own.
+- Login and registration are rate limited. Passwords are stored as bcrypt hashes.
+- Known limitations: JWT is kept in `localStorage`, no TLS inside the Compose setup (terminate TLS at the cloud proxy), no e-mail password reset.

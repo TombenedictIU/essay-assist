@@ -11,6 +11,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Student");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +20,7 @@ export default function Register() {
     setError(null);
     setBusy(true);
     try {
-      const user = await register(name, email, password, role);
+      const user = await register(name, email, password, role, role === "Instructor" ? inviteCode : undefined);
       navigate(user.role === "Instructor" ? "/instructor" : "/student", {
         replace: true,
       });
@@ -71,6 +72,14 @@ export default function Register() {
             ))}
           </div>
         </div>
+        {role === "Instructor" && (
+          <Field
+            label="Instructor invite code"
+            value={inviteCode}
+            onChange={setInviteCode}
+            required
+          />
+        )}
         {error && (
           <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}

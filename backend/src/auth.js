@@ -1,8 +1,24 @@
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { db } from "./db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
+// Placeholder values that must never be used to sign tokens.
+const PLACEHOLDER_SECRETS = new Set(["", "dev-secret-change-me", "change-me-in-production"]);
+
+function resolveSecret() {
+  const configured = process.env.JWT_SECRET;
+  if (configured && !PLACEHOLDER_SECRETS.has(configured)) return configured;
+  // No usable secret configured: generate a random one for this process.
+  // Tokens then become invalid on restart, which is safe and needs no setup.
+  console.warn(
+    "[auth] JWT_SECRET is not set (or is a placeholder); using a random per-process secret. " +
+      "Set JWT_SECRET to keep sessions valid across restarts."
+  );
+  return crypto.randomBytes(48).toString("hex");
+}
+
+const JWT_SECRET = resolveSecret();
 const JWT_EXPIRES_IN = "7d";
 
 export function hashPassword(pw) {
@@ -45,4 +61,11 @@ export function requireRole(role) {
       return res.status(403).json({ error: "Forbidden" });
     next();
   };
+}
+
+/** Constant-time string comparison (used for the instructor invite code). */
+export function safeEqual(a, b) {
+  const ha = crypto.createHash("sha256").update(String(a ?? "")).digest();
+  const hb = crypto.createHash("sha256").update(String(b ?? "")).digest();
+  return crypto.timingSafeEqual(ha, hb);
 }

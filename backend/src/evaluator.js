@@ -14,7 +14,7 @@ export function scheduleEvaluation(submissionId) {
   });
 }
 
-function evaluateNow(submissionId) {
+export function evaluateNow(submissionId) {
   const row = db
     .prepare(
       `SELECT s.id, s.content, s.status, a.required_keywords
@@ -33,7 +33,7 @@ function evaluateNow(submissionId) {
     .filter(Boolean);
 
   const text = row.content.toLowerCase();
-  const hits = keywords.filter((k) => text.includes(k)).length;
+  const hits = keywords.filter((k) => containsWholeTerm(text, k)).length;
   const score = keywords.length
     ? Math.round((hits / keywords.length) * 100)
     : 0;
@@ -47,4 +47,25 @@ function evaluateNow(submissionId) {
   console.log(
     `[evaluator] submission ${submissionId} scored ${score} (${hits}/${keywords.length})`
   );
+}
+
+/**
+ * Whole-term matching: "bias" must not match "unbiased".
+ * A term matches when it is not directly preceded or followed by a letter or digit.
+ */
+export function containsWholeTerm(text, term) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, "u").test(text);
+}
+
+/**
+ * Start-up recovery: re-schedule every submission that is still Pending,
+ * e.g. because the process stopped before the deferred evaluation ran.
+ * Returns the number of submissions scheduled.
+ */
+export function recoverPending() {
+  const rows = db.prepare("SELECT id FROM submissions WHERE status = 'Pending'").all();
+  rows.forEach((r) => scheduleEvaluation(r.id));
+  if (rows.length) console.log(`[evaluator] recovery sweep scheduled ${rows.length} pending submission(s)`);
+  return rows.length;
 }

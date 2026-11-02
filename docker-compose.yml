@@ -3,7 +3,11 @@ services:
     build: ./backend
     container_name: evalqueue-backend
     environment:
-      JWT_SECRET: change-me-in-production
+      # Set in a .env file next to this file (see .env.example). If empty, a random
+      # per-process secret is generated and sessions end when the container restarts.
+      JWT_SECRET: ${JWT_SECRET:-}
+      # Instructor registration is disabled unless an invite code is configured.
+      INSTRUCTOR_INVITE_CODE: ${INSTRUCTOR_INVITE_CODE:-}
       PORT: 4000
       NODE_ENV: production
     volumes:
